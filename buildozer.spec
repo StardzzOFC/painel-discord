@@ -20,7 +20,9 @@ version = 0.1
 # "ModuleNotFoundError: No module named 'aiohttp'". Fixamos versoes
 # anteriores ao pacote "propcache" (que aiohttp passou a exigir a partir
 # da 3.10 e nao tem como compilar pro Android).
-requirements = python3==3.11.9,hostpython3==3.11.9,kivy==2.3.0,pillow,attrs==23.2.0,aiosignal==1.3.1,frozenlist==1.4.1,multidict==6.0.5,yarl==1.9.4,aiohttp==3.9.5,discord.py==2.4.0
+# certifi e o certificado SSL usado pra resolver o erro de conexao no
+# Android (ver comentario no main.py, perto do SSL_CERT_FILE)
+requirements = python3==3.11.9,hostpython3==3.11.9,kivy==2.3.0,pillow,certifi,attrs==23.2.0,aiosignal==1.3.1,frozenlist==1.4.1,multidict==6.0.5,yarl==1.9.4,aiohttp==3.9.5,discord.py==2.4.0
 
 orientation = portrait
 fullscreen = 0

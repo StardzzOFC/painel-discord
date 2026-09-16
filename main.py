@@ -31,8 +31,16 @@ from kivy.utils import escape_markup
 # ERRO_IMPORT_DISCORD sendo None = tudo certo, app segue normal.
 ERRO_IMPORT_DISCORD = None
 try:
+    import ssl
+    import certifi
     import discord
     from discord import ui
+    # No Android o Python nao acha sozinho os certificados SSL do sistema,
+    # e qualquer conexao HTTPS/WSS (como a do discord.py com o Discord)
+    # falha com um erro generico de conexao. Apontando essa variavel pro
+    # certificado que vem junto com o certifi, o ssl padrao do Python passa
+    # a enxergar os certificados corretamente.
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 except Exception:
     ERRO_IMPORT_DISCORD = traceback.format_exc()
     import types
