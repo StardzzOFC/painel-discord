@@ -52,7 +52,12 @@ jobs:
           PROPCACHE_NO_EXTENSIONS: "1"
         run: |
           set -o pipefail
-          yes | buildozer -v android debug 2>&1 | tee build.log
+          # "|| true" no yes evita que o job falhe por causa do erro de
+          # "Broken pipe" que o proprio "yes" solta quando o buildozer
+          # termina de ler a entrada (mesmo com o build tendo dado certo).
+          # Sem isso, o pipefail pegava esse erro do "yes" e marcava o
+          # job inteiro como failed, mesmo o APK sendo gerado com sucesso.
+          (yes || true) | buildozer -v android debug 2>&1 | tee build.log
 
       - name: Se der erro, mostrar so a parte importante do log
         if: failure()
