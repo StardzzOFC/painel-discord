@@ -8,9 +8,7 @@ import os
 import re
 import threading
 import asyncio
-
-import discord
-from discord import ui
+import traceback
 
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
@@ -27,6 +25,19 @@ from kivy.core.window import Window
 from kivy.graphics import Color, RoundedRectangle
 from kivy.metrics import dp
 from kivy.utils import escape_markup
+
+# Se o discord.py falhar ao carregar (biblioteca nativa incompativel, etc.),
+# guardamos o erro aqui em vez de deixar o app fechar sem explicar nada.
+# ERRO_IMPORT_DISCORD sendo None = tudo certo, app segue normal.
+ERRO_IMPORT_DISCORD = None
+try:
+    import discord
+    from discord import ui
+except Exception:
+    ERRO_IMPORT_DISCORD = traceback.format_exc()
+    import types
+    discord = types.SimpleNamespace()
+    ui = types.SimpleNamespace(View=object)
 
 # ---------------------------------------------------------------------------
 # Paleta de cores (estilo Discord dark)
@@ -180,6 +191,8 @@ class DiscordBackend:
         self.loop = None
         self.client = None
         self.ready = threading.Event()
+        self.error_event = threading.Event()
+        self.error_message = ""
         self.guilds_cache = []
         self.on_message_callback = None
         self.on_edit_callback = None
@@ -187,6 +200,9 @@ class DiscordBackend:
         self.on_reaction_remove_callback = None
 
     def start(self, token):
+        self.ready.clear()
+        self.error_event.clear()
+        self.error_message = ""
         self.loop = asyncio.new_event_loop()
         t = threading.Thread(target=self._run, args=(token,), daemon=True)
         t.start()
@@ -232,8 +248,16 @@ class DiscordBackend:
 
         try:
             self.loop.run_until_complete(self.client.start(token))
+        except discord.LoginFailure:
+            self.error_message = "Token invalido. Confira o token do bot e tente de novo."
+            self.error_event.set()
+        except (discord.HTTPException, discord.ConnectionClosed, OSError):
+            self.error_message = "Nao foi possivel conectar. Verifique sua internet e tente de novo."
+            self.error_event.set()
         except Exception as e:
             print("Erro ao conectar bot:", e)
+            self.error_message = "Erro ao conectar. Tente novamente."
+            self.error_event.set()
 
     def run_coro(self, coro, timeout=15):
         future = asyncio.run_coroutine_threadsafe(coro, self.loop)
@@ -299,40 +323,82 @@ backend = DiscordBackend()
 class LoginScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        root = BoxLayout(orientation="vertical", padding=dp(24), spacing=dp(14))
-        flat_bg(root, BG_APP)
+        outer = BoxLayout(orientation="vertical")
+        flat_bg(outer, BG_APP)
 
-        title = Label(text="Painel Discord", font_size=dp(26), bold=True,
-                      color=TEXT_WHITE, size_hint_y=None, height=dp(50))
-        subtitle = Label(text="Cole o token do seu bot para conectar",
-                          color=TEXT_MUTED, size_hint_y=None, height=dp(26))
+        # Cartao central com o formulario, nao ocupa a tela inteira
+        card_wrap = BoxLayout(orientation="vertical", padding=dp(28), spacing=dp(16))
+        card_wrap.add_widget(Widget(size_hint_y=1))
 
+        card = BoxLayout(orientation="vertical", padding=dp(24), spacing=dp(14),
+                          size_hint_y=None, height=dp(360))
+        rounded_bg(card, BG_SIDEBAR, radius=dp(18))
+
+        # Selo redondo com as iniciais do app (identidade propria, nao o logo do Discord)
+        from kivy.uix.floatlayout import FloatLayout
+        badge_wrap = BoxLayout(size_hint_y=None, height=dp(64))
+        badge_holder = FloatLayout(size_hint=(None, None), size=(dp(64), dp(64)),
+                                    pos_hint={"center_x": 0.5})
+        badge = Widget(size_hint=(None, None), size=(dp(64), dp(64)),
+                        pos_hint={"center_x": 0.5, "center_y": 0.5})
+        with badge.canvas:
+            Color(*ACCENT)
+            badge._circle = RoundedRectangle(pos=badge.pos, size=badge.size, radius=[dp(32)])
+        badge.bind(pos=lambda w, v: setattr(w._circle, "pos", v))
+        badge_label = Label(text="PD", bold=True, font_size=dp(22), color=TEXT_WHITE,
+                             pos_hint={"center_x": 0.5, "center_y": 0.5})
+        badge_holder.add_widget(badge)
+        badge_holder.add_widget(badge_label)
+        badge_wrap.add_widget(Widget())
+        badge_wrap.add_widget(badge_holder)
+        badge_wrap.add_widget(Widget())
+
+        title = Label(text="Painel Discord", font_size=dp(24), bold=True,
+                      color=TEXT_WHITE, size_hint_y=None, height=dp(34))
+        subtitle = Label(text="Painel de controle para o seu bot",
+                          color=TEXT_MUTED, font_size=dp(13),
+                          size_hint_y=None, height=dp(22))
+
+        token_label = Label(text="Token do bot", color=TEXT_MUTED, font_size=dp(12),
+                             halign="left", size_hint_y=None, height=dp(18))
+        token_label.bind(size=lambda w, v: setattr(w, "text_size", v))
+
+        input_wrap = BoxLayout(size_hint_y=None, height=dp(48), padding=(dp(2), dp(2)))
+        rounded_bg(input_wrap, BG_MAIN, radius=dp(10))
         self.token_input = TextInput(
-            hint_text="Token do bot", multiline=False, password=True,
-            size_hint_y=None, height=dp(48),
-            background_color=BG_MAIN, foreground_color=TEXT_WHITE,
-            cursor_color=TEXT_WHITE, padding=(dp(12), dp(12))
+            hint_text="Cole o token aqui", multiline=False, password=True,
+            background_color=(0, 0, 0, 0), foreground_color=TEXT_WHITE,
+            cursor_color=ACCENT, padding=(dp(12), dp(12)),
+            background_normal="", background_active=""
         )
+        input_wrap.add_widget(self.token_input)
 
-        salvar_box = BoxLayout(size_hint_y=None, height=dp(36), spacing=dp(8))
-        self.salvar_check = CheckBox(size_hint_x=None, width=dp(30))
+        salvar_box = BoxLayout(size_hint_y=None, height=dp(32), spacing=dp(8))
+        self.salvar_check = CheckBox(size_hint_x=None, width=dp(28))
         salvar_box.add_widget(self.salvar_check)
-        salvar_box.add_widget(Label(text="Salvar token neste aparelho", color=TEXT_MUTED))
+        salvar_box.add_widget(Label(text="Salvar token neste aparelho",
+                                     color=TEXT_MUTED, font_size=dp(13)))
 
-        self.status_label = Label(text="", color=TEXT_MUTED, size_hint_y=None, height=dp(26))
+        self.status_label = Label(text="", color=TEXT_MUTED, font_size=dp(13),
+                                   size_hint_y=None, height=dp(24))
 
         self.connect_btn = FlatButton(text="Conectar", bg_color=ACCENT,
-                                       size_hint_y=None, height=dp(50))
+                                       size_hint_y=None, height=dp(48))
         self.connect_btn.bind(on_press=self.conectar)
 
-        root.add_widget(title)
-        root.add_widget(subtitle)
-        root.add_widget(self.token_input)
-        root.add_widget(salvar_box)
-        root.add_widget(self.connect_btn)
-        root.add_widget(self.status_label)
-        root.add_widget(BoxLayout())
-        self.add_widget(root)
+        card.add_widget(badge_wrap)
+        card.add_widget(title)
+        card.add_widget(subtitle)
+        card.add_widget(token_label)
+        card.add_widget(input_wrap)
+        card.add_widget(salvar_box)
+        card.add_widget(self.connect_btn)
+        card.add_widget(self.status_label)
+
+        card_wrap.add_widget(card)
+        card_wrap.add_widget(Widget(size_hint_y=1))
+        outer.add_widget(card_wrap)
+        self.add_widget(outer)
 
     def on_pre_enter(self):
         caminho = os.path.join(App.get_running_app().user_data_dir, TOKEN_FILE)
@@ -345,6 +411,7 @@ class LoginScreen(Screen):
         token = self.token_input.text.strip()
         if not token:
             self.status_label.text = "Cole um token valido."
+            self.status_label.color = RED_DND
             return
 
         if self.salvar_check.active:
@@ -357,15 +424,33 @@ class LoginScreen(Screen):
                 os.remove(caminho)
 
         self.status_label.text = "Conectando..."
+        self.status_label.color = TEXT_MUTED
         self.connect_btn.disabled = True
+        self._tentativas = 0
         backend.start(token)
         Clock.schedule_interval(self.checar_conexao, 0.5)
 
     def checar_conexao(self, _dt):
+        self._tentativas += 1
+
         if backend.ready.is_set():
             self.status_label.text = "Conectado!"
+            self.status_label.color = GREEN_ONLINE
             self.manager.transition = SlideTransition(direction="left", duration=0.3)
             self.manager.current = "servidores"
+            self.connect_btn.disabled = False
+            return False
+
+        if backend.error_event.is_set():
+            self.status_label.text = backend.error_message
+            self.status_label.color = RED_DND
+            self.connect_btn.disabled = False
+            return False
+
+        # Tempo esgotado (20s) sem conectar nem dar erro explicito
+        if self._tentativas >= 40:
+            self.status_label.text = "Tempo esgotado. Verifique sua internet e tente de novo."
+            self.status_label.color = RED_DND
             self.connect_btn.disabled = False
             return False
 
@@ -836,5 +921,42 @@ class PainelDiscordApp(App):
         return sm
 
 
+class ErroInicializacaoApp(App):
+    """Tela simples mostrada quando o app nao consegue nem carregar o
+    discord.py - assim da pra ler o motivo direto na tela do celular,
+    sem precisar de cabo USB nem app de log."""
+    def build(self):
+        Window.clearcolor = BG_APP
+        root = BoxLayout(orientation="vertical", padding=dp(20), spacing=dp(12))
+        flat_bg(root, BG_APP)
+
+        titulo = Label(text="Nao foi possivel iniciar o app",
+                        bold=True, font_size=dp(18), color=RED_DND,
+                        size_hint_y=None, height=dp(40))
+        subtitulo = Label(
+            text="Tire um print desta tela e mande pra quem esta te ajudando:",
+            color=TEXT_MUTED, font_size=dp(13), size_hint_y=None, height=dp(50),
+            halign="left")
+        subtitulo.bind(size=lambda w, v: setattr(w, "text_size", v))
+
+        scroll = ScrollView()
+        erro_label = Label(
+            text=ERRO_IMPORT_DISCORD or "(erro desconhecido)",
+            color=TEXT_WHITE, font_size=dp(12), size_hint_y=None,
+            halign="left", valign="top")
+        erro_label.bind(
+            width=lambda w, v: setattr(w, "text_size", (v, None)),
+            texture_size=lambda w, v: setattr(w, "height", v[1]))
+        scroll.add_widget(erro_label)
+
+        root.add_widget(titulo)
+        root.add_widget(subtitulo)
+        root.add_widget(scroll)
+        return root
+
+
 if __name__ == "__main__":
-    PainelDiscordApp().run()
+    if ERRO_IMPORT_DISCORD:
+        ErroInicializacaoApp().run()
+    else:
+        PainelDiscordApp().run()
