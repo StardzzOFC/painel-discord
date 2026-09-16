@@ -21,7 +21,10 @@ fullscreen = 0
 # Permissao de internet e necessaria pro bot conectar no Discord
 android.permissions = INTERNET
 
-android.api = 33
+# API 35 (Android 15) e o minimo que o Google Play exige atualmente
+# (ate 31/08/2026). Com API 33 o Android tratava o app como "feito pra
+# versao antiga", o que deixa os avisos do Play Protect mais agressivos.
+android.api = 35
 android.minapi = 24
 android.ndk = 25b
 # armeabi-v7a (32 bits) roda tanto em celular de 32 quanto de 64 bits.
