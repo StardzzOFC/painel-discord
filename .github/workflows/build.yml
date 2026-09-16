@@ -57,11 +57,11 @@ jobs:
       - name: Se der erro, mostrar so a parte importante do log
         if: failure()
         run: |
-          echo "===== ULTIMAS 150 LINHAS DO LOG ====="
-          tail -n 150 build.log
+          echo "===== ULTIMAS 40 LINHAS DO LOG (onde geralmente esta o erro final) ====="
+          tail -n 40 build.log
           echo ""
-          echo "===== LINHAS QUE MENCIONAM ERRO ====="
-          grep -i -E "error|failed|traceback" build.log | tail -n 80
+          echo "===== LINHA(S) COM O ERRO FATAL DE VERDADE ====="
+          grep -n -E "^# (Command failed|Error)|BUILD FAILED|FAILURE:|Traceback \(most recent call last\)" build.log | tail -n 15
 
       - name: Disponibilizar o APK pra download
         uses: actions/upload-artifact@v4
