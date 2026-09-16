@@ -11,9 +11,16 @@ version = 0.1
 # python3==3.11.9 fixa a versao do Python usada DENTRO do app Android -
 # versoes mais novas (3.13/3.14) ainda tem incompatibilidades com o Kivy.
 # hostpython3 precisa ser a MESMA versao (regra do proprio python-for-android)
-# Nao fixamos mais aiohttp/multidict/yarl/frozenlist - o discord.py escolhe
-# sozinho versoes compativeis (fixar todas juntas estava gerando conflito)
-requirements = python3==3.11.9,hostpython3==3.11.9,kivy==2.3.0,discord.py==2.4.0,pillow
+#
+# IMPORTANTE: o processo de build do Android instala os requirements com
+# "pip install --no-deps", ou seja, ele NAO baixa sozinho as dependencias
+# de cada pacote. Por isso discord.py sozinho nao é suficiente - sem
+# listar aiohttp/multidict/yarl/frozenlist/attrs/aiosignal aqui, o app
+# compila e instala normalmente, mas fecha na hora de abrir com
+# "ModuleNotFoundError: No module named 'aiohttp'". Fixamos versoes
+# anteriores ao pacote "propcache" (que aiohttp passou a exigir a partir
+# da 3.10 e nao tem como compilar pro Android).
+requirements = python3==3.11.9,hostpython3==3.11.9,kivy==2.3.0,pillow,attrs==23.2.0,aiosignal==1.3.1,frozenlist==1.4.1,multidict==6.0.5,yarl==1.9.4,aiohttp==3.9.5,discord.py==2.4.0
 
 orientation = portrait
 fullscreen = 0

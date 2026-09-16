@@ -251,6 +251,14 @@ class DiscordBackend:
         except discord.LoginFailure:
             self.error_message = "Token invalido. Confira o token do bot e tente de novo."
             self.error_event.set()
+        except discord.PrivilegedIntentsRequired:
+            self.error_message = (
+                "Faltam permissoes ativar no bot. Va no Discord Developer "
+                "Portal > sua aplicacao > Bot, e ative:\n"
+                "PRESENCE INTENT, SERVER MEMBERS INTENT e "
+                "MESSAGE CONTENT INTENT. Depois tente conectar de novo."
+            )
+            self.error_event.set()
         except (discord.HTTPException, discord.ConnectionClosed, OSError):
             self.error_message = "Nao foi possivel conectar. Verifique sua internet e tente de novo."
             self.error_event.set()
@@ -330,8 +338,8 @@ class LoginScreen(Screen):
         card_wrap = BoxLayout(orientation="vertical", padding=dp(28), spacing=dp(16))
         card_wrap.add_widget(Widget(size_hint_y=1))
 
-        card = BoxLayout(orientation="vertical", padding=dp(24), spacing=dp(14),
-                          size_hint_y=None, height=dp(360))
+        card = BoxLayout(orientation="vertical", padding=dp(24), spacing=dp(12),
+                          size_hint_y=None, height=dp(440))
         rounded_bg(card, BG_SIDEBAR, radius=dp(18))
 
         # Selo redondo com as iniciais do app (identidade propria, nao o logo do Discord)
@@ -363,6 +371,15 @@ class LoginScreen(Screen):
                              halign="left", size_hint_y=None, height=dp(18))
         token_label.bind(size=lambda w, v: setattr(w, "text_size", v))
 
+        instrucao_token = Label(
+            text=("Como pegar: discord.com/developers/applications > sua "
+                  "aplicacao > Bot > Reset Token (ou Copy, se ja existir um)"),
+            color=TEXT_MUTED, font_size=dp(11), halign="left", valign="top",
+            size_hint_y=None)
+        instrucao_token.bind(
+            width=lambda w, v: setattr(w, "text_size", (v, None)),
+            texture_size=lambda w, v: setattr(w, "height", v[1]))
+
         input_wrap = BoxLayout(size_hint_y=None, height=dp(48), padding=(dp(2), dp(2)))
         rounded_bg(input_wrap, BG_MAIN, radius=dp(10))
         self.token_input = TextInput(
@@ -379,8 +396,11 @@ class LoginScreen(Screen):
         salvar_box.add_widget(Label(text="Salvar token neste aparelho",
                                      color=TEXT_MUTED, font_size=dp(13)))
 
-        self.status_label = Label(text="", color=TEXT_MUTED, font_size=dp(13),
-                                   size_hint_y=None, height=dp(24))
+        self.status_label = Label(text="", color=TEXT_MUTED, font_size=dp(12),
+                                   size_hint_y=None, height=dp(24), halign="center")
+        self.status_label.bind(
+            width=lambda w, v: setattr(w, "text_size", (v, None)),
+            texture_size=lambda w, v: setattr(w, "height", max(dp(24), v[1])))
 
         self.connect_btn = FlatButton(text="Conectar", bg_color=ACCENT,
                                        size_hint_y=None, height=dp(48))
@@ -390,6 +410,7 @@ class LoginScreen(Screen):
         card.add_widget(title)
         card.add_widget(subtitle)
         card.add_widget(token_label)
+        card.add_widget(instrucao_token)
         card.add_widget(input_wrap)
         card.add_widget(salvar_box)
         card.add_widget(self.connect_btn)
