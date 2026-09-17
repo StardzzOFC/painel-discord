@@ -267,12 +267,12 @@ class DiscordBackend:
                 "MESSAGE CONTENT INTENT. Depois tente conectar de novo."
             )
             self.error_event.set()
-        except (discord.HTTPException, discord.ConnectionClosed, OSError):
-            self.error_message = "Nao foi possivel conectar. Verifique sua internet e tente de novo."
-            self.error_event.set()
         except Exception as e:
-            print("Erro ao conectar bot:", e)
-            self.error_message = "Erro ao conectar. Tente novamente."
+            print("Erro ao conectar bot:", repr(e))
+            self.error_message = (
+                "Nao foi possivel conectar.\n"
+                f"Detalhe tecnico: {type(e).__name__}: {e}"
+            )
             self.error_event.set()
 
     def run_coro(self, coro, timeout=15):
