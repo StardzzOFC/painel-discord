@@ -33,6 +33,7 @@ ERRO_IMPORT_DISCORD = None
 try:
     import ssl
     import certifi
+    import aiohttp
     import discord
     from discord import ui
     # No Android o Python nao acha sozinho os certificados SSL do sistema,
@@ -226,6 +227,17 @@ class DiscordBackend:
         intents.presences = True    # precisa ativar "Presence Intent" no dev portal
 
         self.client = discord.Client(intents=intents)
+
+        # O SSL_CERT_FILE nao funcionou sozinho no Android (o OpenSSL
+        # compilado pro app ignora essa variavel). Aqui a gente configura
+        # na mao o "conector" que o discord.py usa por baixo dos panos,
+        # tanto pra API quanto pro WebSocket, apontando pro certificado
+        # do certifi - isso resolve o "CERTIFICATE_VERIFY_FAILED".
+        import socket as _socket
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        self.client.http.connector = aiohttp.TCPConnector(
+            ssl=ssl_context, limit=0, family=_socket.AF_INET
+        )
 
         @self.client.event
         async def on_ready():
