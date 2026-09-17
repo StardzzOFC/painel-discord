@@ -95,6 +95,29 @@ class FlatButton(Button):
         rounded_bg(self, bg_color, radius)
 
 
+def build_topbar(title, on_back=None, right_widget=None):
+    """Cabecalho padrao usado em Canais/Membros/Chat: botao de voltar
+    circular + titulo + espaco opcional pra um widget extra a direita."""
+    bar = BoxLayout(size_hint_y=None, height=dp(58), padding=(dp(10), dp(8)), spacing=dp(10))
+    flat_bg(bar, BG_MAIN)
+
+    if on_back:
+        back_btn = FlatButton(text="\u2039", bg_color=BG_SIDEBAR, radius=dp(20),
+                               font_size=dp(24), size_hint=(None, None), size=(dp(40), dp(40)))
+        back_btn.bind(on_press=on_back)
+        bar.add_widget(back_btn)
+
+    title_label = Label(text=title, bold=True, color=TEXT_WHITE, font_size=dp(16),
+                         halign="left", valign="middle", shorten=True)
+    title_label.bind(size=lambda w, v: setattr(w, "text_size", v))
+    bar.add_widget(title_label)
+
+    if right_widget:
+        bar.add_widget(right_widget)
+
+    return bar
+
+
 class CircleAvatar(Widget):
     """Avatar circular a partir de uma URL (usa RoundedRectangle com raio = metade do lado)."""
     def __init__(self, source="", size_px=dp(36), **kwargs):
@@ -509,27 +532,33 @@ class ServidoresScreen(Screen):
     def on_enter(self):
         self.root_box.clear_widgets()
 
-        header = Label(text="SERVIDORES", bold=True, color=TEXT_MUTED,
-                        size_hint_y=None, height=dp(44))
+        header = BoxLayout(size_hint_y=None, height=dp(58), padding=(dp(20), 0))
+        flat_bg(header, BG_MAIN)
+        titulo = Label(text="Servidores", bold=True, color=TEXT_WHITE, font_size=dp(18),
+                        halign="left", valign="middle")
+        titulo.bind(size=lambda w, v: setattr(w, "text_size", v))
+        header.add_widget(titulo)
         self.root_box.add_widget(header)
 
         scroll = ScrollView()
-        lista = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6), padding=dp(10))
+        lista = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(10), padding=dp(14))
         lista.bind(minimum_height=lista.setter("height"))
 
         for guild in backend.get_guilds():
-            item = BoxLayout(size_hint_y=None, height=dp(56), spacing=dp(12), padding=(dp(6), 0))
-            rounded_bg(item, BG_MAIN, radius=dp(12))
+            item = BoxLayout(size_hint_y=None, height=dp(64), spacing=dp(14), padding=(dp(12), 0))
+            rounded_bg(item, BG_MAIN, radius=dp(14))
             icon_url = guild.icon.url if guild.icon else ""
-            item.add_widget(CircleAvatar(source=icon_url, size_px=dp(42)))
-            info = BoxLayout(orientation="vertical")
-            info.add_widget(Label(text=guild.name, color=TEXT_WHITE, bold=True,
-                                   halign="left", valign="middle", shorten=True))
+            item.add_widget(CircleAvatar(source=icon_url, size_px=dp(44)))
+            info = BoxLayout(orientation="vertical", spacing=dp(2))
+            info.add_widget(Label(text=guild.name, color=TEXT_WHITE, bold=True, font_size=dp(15),
+                                   halign="left", valign="bottom", shorten=True))
             info.add_widget(Label(text=f"{guild.member_count} membros", color=TEXT_MUTED,
-                                   halign="left", valign="middle", font_size=dp(12)))
+                                   halign="left", valign="top", font_size=dp(12)))
             for lbl in info.children:
                 lbl.bind(size=lambda w, v: setattr(w, "text_size", v))
             item.add_widget(info)
+            item.add_widget(Label(text="\u203a", color=TEXT_MUTED, font_size=dp(20),
+                                   size_hint_x=None, width=dp(20)))
 
             btn_overlay = Button(background_color=(0, 0, 0, 0), background_normal="")
             btn_overlay.bind(on_press=lambda inst, g=guild: self.abrir_servidor(g))
@@ -562,26 +591,36 @@ class CanaisScreen(Screen):
         app = App.get_running_app()
         guild = app.selected_guild
 
-        topo = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(8), 0), spacing=dp(6))
-        voltar = FlatButton(text="< Servidores", bg_color=BG_MAIN,
-                             size_hint_x=None, width=dp(130))
-        voltar.bind(on_press=self.voltar)
-        membros_btn = FlatButton(text="Membros", bg_color=ACCENT, size_hint_x=None, width=dp(100))
+        membros_btn = FlatButton(text="Membros", bg_color=ACCENT, radius=dp(14),
+                                  font_size=dp(13), size_hint=(None, None),
+                                  size=(dp(96), dp(36)))
         membros_btn.bind(on_press=self.abrir_membros)
-        topo.add_widget(voltar)
-        topo.add_widget(Label(text=guild.name if guild else "", color=TEXT_MUTED, shorten=True))
-        topo.add_widget(membros_btn)
-        self.root_box.add_widget(topo)
+        self.root_box.add_widget(build_topbar(
+            guild.name if guild else "", on_back=self.voltar, right_widget=membros_btn))
 
         scroll = ScrollView()
-        lista = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(4), padding=dp(8))
+        lista = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8), padding=dp(14))
         lista.bind(minimum_height=lista.setter("height"))
 
         for canal in backend.get_text_channels(guild.id):
-            btn = FlatButton(text=f"#  {canal.name}", bg_color=BG_MAIN,
-                              size_hint_y=None, height=dp(46), halign="left")
-            btn.bind(on_press=lambda inst, c=canal: self.abrir_canal(c))
-            lista.add_widget(btn)
+            item = BoxLayout(size_hint_y=None, height=dp(52), spacing=dp(12), padding=(dp(12), 0))
+            rounded_bg(item, BG_MAIN, radius=dp(12))
+
+            badge = Label(text="#", bold=True, color=ACCENT, font_size=dp(16),
+                          size_hint=(None, None), size=(dp(30), dp(30)))
+            rounded_bg(badge, BG_SIDEBAR, radius=dp(15))
+            item.add_widget(badge)
+
+            nome = Label(text=canal.name, color=TEXT_WHITE, font_size=dp(14),
+                        halign="left", valign="middle", shorten=True)
+            nome.bind(size=lambda w, v: setattr(w, "text_size", v))
+            item.add_widget(nome)
+
+            btn_overlay = Button(background_color=(0, 0, 0, 0), background_normal="")
+            btn_overlay.bind(on_press=lambda inst, c=canal: self.abrir_canal(c))
+            item.add_widget(btn_overlay)
+
+            lista.add_widget(item)
 
         scroll.add_widget(lista)
         self.root_box.add_widget(scroll)
@@ -616,34 +655,46 @@ class MembrosScreen(Screen):
         app = App.get_running_app()
         guild = app.selected_guild
 
-        topo = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(8), 0))
-        voltar = FlatButton(text="< Canais", bg_color=BG_MAIN, size_hint_x=None, width=dp(110))
-        voltar.bind(on_press=self.voltar)
-        topo.add_widget(voltar)
-        topo.add_widget(Label(text="Membros", color=TEXT_WHITE, bold=True))
-        self.root_box.add_widget(topo)
+        self.root_box.add_widget(build_topbar("Membros", on_back=self.voltar))
 
         scroll = ScrollView()
-        lista = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(4), padding=dp(8))
+        lista = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(8), padding=dp(14))
         lista.bind(minimum_height=lista.setter("height"))
 
         for membro in backend.get_members(guild.id):
-            item = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10), padding=(dp(6), 0))
-            avatar_box = BoxLayout(size_hint=(None, None), size=(dp(36), dp(36)))
-            avatar_box.add_widget(CircleAvatar(source=membro.display_avatar.url, size_px=dp(36)))
-            dot = Widget(size_hint=(None, None), size=(dp(10), dp(10)))
+            item = BoxLayout(size_hint_y=None, height=dp(58), spacing=dp(12), padding=(dp(12), 0))
+            rounded_bg(item, BG_MAIN, radius=dp(12))
+
+            avatar_box = BoxLayout(size_hint=(None, None), size=(dp(58), dp(40)), spacing=dp(5))
+            avatar_box.add_widget(CircleAvatar(source=membro.display_avatar.url, size_px=dp(40)))
+            dot = Widget(size_hint=(None, None), size=(dp(13), dp(13)))
             with dot.canvas:
-                Color(*status_color(membro.status))
+                Color(*BG_MAIN)
                 from kivy.graphics import Ellipse
-                dot._el = Ellipse(pos=dot.pos, size=dot.size)
-            dot.bind(pos=lambda w, v: setattr(w._el, "pos", v))
+                dot._ring = Ellipse(pos=dot.pos, size=dot.size)
+                Color(*status_color(membro.status))
+                dot._el = Ellipse(pos=(dot.pos[0] + dp(1.5), dot.pos[1] + dp(1.5)),
+                                   size=(dot.size[0] - dp(3), dot.size[1] - dp(3)))
+            def _sync_dot(w, v, dot=dot):
+                dot._ring.pos = dot.pos
+                dot._ring.size = dot.size
+                dot._el.pos = (dot.pos[0] + dp(1.5), dot.pos[1] + dp(1.5))
+                dot._el.size = (dot.size[0] - dp(3), dot.size[1] - dp(3))
+            dot.bind(pos=_sync_dot)
             avatar_box.add_widget(dot)
 
-            nome = Label(text=membro.display_name, color=TEXT_WHITE, halign="left", valign="middle")
-            nome.bind(size=lambda w, v: setattr(w, "text_size", v))
+            info = BoxLayout(orientation="vertical", spacing=dp(2))
+            nome = Label(text=membro.display_name, color=TEXT_WHITE, font_size=dp(14),
+                        bold=True, halign="left", valign="bottom")
+            status_lbl = Label(text=str(membro.status).capitalize(), color=TEXT_MUTED,
+                               font_size=dp(11), halign="left", valign="top")
+            for lbl in (nome, status_lbl):
+                lbl.bind(size=lambda w, v: setattr(w, "text_size", v))
+            info.add_widget(nome)
+            info.add_widget(status_lbl)
 
             item.add_widget(avatar_box)
-            item.add_widget(nome)
+            item.add_widget(info)
             lista.add_widget(item)
 
         scroll.add_widget(lista)
@@ -674,12 +725,7 @@ class ChatScreen(Screen):
         app = App.get_running_app()
         canal = app.selected_channel
 
-        topo = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(8), 0))
-        voltar = FlatButton(text="< Canais", bg_color=BG_SIDEBAR, size_hint_x=None, width=dp(110))
-        voltar.bind(on_press=self.voltar)
-        topo.add_widget(voltar)
-        topo.add_widget(Label(text=f"#  {canal.name}", color=TEXT_WHITE, bold=True))
-        self.root_box.add_widget(topo)
+        self.root_box.add_widget(build_topbar(f"#  {canal.name}", on_back=self.voltar))
 
         self.scroll = ScrollView()
         self.mensagens_box = BoxLayout(orientation="vertical", size_hint_y=None,
@@ -691,13 +737,20 @@ class ChatScreen(Screen):
         self.reply_bar_holder = BoxLayout(size_hint_y=None, height=0)
         self.root_box.add_widget(self.reply_bar_holder)
 
-        rodape = BoxLayout(size_hint_y=None, height=dp(54), spacing=dp(8), padding=(dp(8), dp(4)))
+        rodape = BoxLayout(size_hint_y=None, height=dp(64), spacing=dp(10),
+                            padding=(dp(10), dp(8)))
+        input_wrap = BoxLayout(padding=(dp(4), dp(4)))
+        rounded_bg(input_wrap, BG_BUBBLE, radius=dp(22))
         self.input_msg = TextInput(hint_text="Digite uma mensagem...", multiline=False,
-                                    background_color=BG_BUBBLE, foreground_color=TEXT_WHITE,
-                                    cursor_color=TEXT_WHITE, padding=(dp(12), dp(12)))
-        enviar_btn = FlatButton(text="Enviar", bg_color=ACCENT, size_hint_x=None, width=dp(90))
+                                    background_color=(0, 0, 0, 0), foreground_color=TEXT_WHITE,
+                                    cursor_color=ACCENT, padding=(dp(16), dp(13)),
+                                    background_normal="", background_active="")
+        input_wrap.add_widget(self.input_msg)
+        rodape.add_widget(input_wrap)
+
+        enviar_btn = FlatButton(text="\u27a4", bg_color=ACCENT, radius=dp(24),
+                                 font_size=dp(18), size_hint=(None, None), size=(dp(48), dp(48)))
         enviar_btn.bind(on_press=self.enviar)
-        rodape.add_widget(self.input_msg)
         rodape.add_widget(enviar_btn)
         self.root_box.add_widget(rodape)
 
@@ -899,13 +952,18 @@ class ChatScreen(Screen):
     def marcar_resposta(self, message):
         self.reply_target = message
         self.reply_bar_holder.clear_widgets()
-        self.reply_bar_holder.height = dp(34)
-        barra = BoxLayout(size_hint_y=None, height=dp(34), padding=(dp(10), dp(4)), spacing=dp(8))
-        rounded_bg(barra, BG_BUBBLE, radius=0)
+        self.reply_bar_holder.height = dp(40)
+        self.reply_bar_holder.padding = (dp(12), dp(4))
+        barra = BoxLayout(size_hint_y=None, height=dp(32), padding=(dp(12), dp(4)), spacing=dp(8))
+        rounded_bg(barra, BG_BUBBLE, radius=dp(10))
         texto = (message.content[:40] + "...") if len(message.content) > 40 else message.content
-        barra.add_widget(Label(text=f"Respondendo a {message.author.display_name}: {texto}",
-                                color=TEXT_MUTED, font_size=dp(12)))
-        cancelar = FlatButton(text="x", bg_color=BG_BUBBLE, size_hint_x=None, width=dp(34))
+        resp_lbl = Label(text=f"\u21aa Respondendo a {message.author.display_name}: {texto}",
+                         color=TEXT_MUTED, font_size=dp(12), halign="left", valign="middle",
+                         shorten=True)
+        resp_lbl.bind(size=lambda w, v: setattr(w, "text_size", v))
+        barra.add_widget(resp_lbl)
+        cancelar = FlatButton(text="\u2715", bg_color=BG_MAIN, radius=dp(12), font_size=dp(12),
+                              size_hint=(None, None), size=(dp(24), dp(24)))
         cancelar.bind(on_press=self.cancelar_resposta)
         barra.add_widget(cancelar)
         self.reply_bar_holder.add_widget(barra)
@@ -914,6 +972,7 @@ class ChatScreen(Screen):
         self.reply_target = None
         self.reply_bar_holder.clear_widgets()
         self.reply_bar_holder.height = 0
+        self.reply_bar_holder.padding = (0, 0)
 
     def enviar(self, *_):
         texto = self.input_msg.text.strip()
